@@ -69,6 +69,10 @@ const dateDisabled = (ts) => {
   }
 }
 
+const isAlreadyBook = computed(() => {
+  return alreadyBook.get(city.value)?.includes()
+})
+
 const columns = [
   {
     title: '房型',
@@ -151,8 +155,11 @@ const handleAreaSelect = (value, option) => {
   areaSelected.value = option
 }
 
-const handleSwitch = (value) => {
+const handleSwitch = (hasBreakfase: boolean) => {
   // TODO
+  if (!hasBreakfase) {
+    tableData.value = tableData.value?.map(i => ({...i, price: Math.ceil(i.price - 3)}))
+  } else if () {}
 }
 </script>
 
