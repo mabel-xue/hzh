@@ -7,11 +7,13 @@ defineProps<{
 <template>
   <div class="greetings">
     <h1 class="green">{{ msg }}</h1>
-    <h3>
-      You’ve successfully created a project with
-      <a href="https://vitejs.dev/" target="_blank" rel="noopener">Vite</a> +
-      <a href="https://vuejs.org/" target="_blank" rel="noopener">Vue 3</a>. What's next?
-    </h3>
+    <p>【系统使用说明】</p>
+    <p>* 查询价格已含代订费</p>
+    <p>* 未查询到的房型表示<b>已售罄</b></p>
+    <p>* 下单以具体情况为准</p>
+    <p>* 本系统仅供本人客户查价使用，不得外传、分享</p>
+    <p>* 系统内无任何付费操作，交易请在正规平台进行</p>
+    <br />
   </div>
 </template>
 
@@ -23,12 +25,11 @@ h1 {
   top: -10px;
 }
 
-h3 {
-  font-size: 1.2rem;
+p {
+  font-size: 0.8rem;
 }
 
-.greetings h1,
-.greetings h3 {
+.greetings h1 {
   text-align: center;
 }
 

@@ -20,7 +20,8 @@ import {
   zhCN,
   dateZhCN
 } from 'naive-ui'
-import { throttle } from 'lodash-es'
+import { throttle, intersection } from 'lodash-es'
+import { getDatesBetween } from './utils'
 
 const alreadyBook = new Map([
   ['北京', ['0923']],
@@ -50,7 +51,8 @@ const loading = ref()
 const hasBreakfase = ref(true)
 const oneDayMillis = 24 * 60 * 60 * 1000
 const tableData = ref()
-const showModal = ref()
+const originTableData = ref()
+const showModal = ref(false)
 const bookText = ref()
 const model = ref({
   name: '',
@@ -58,6 +60,7 @@ const model = ref({
 })
 const areaSelected = ref()
 const selected = ref()
+const tableRef = ref()
 
 const dateDisabled = (ts) => {
   const date = new Date(ts).getDate()
@@ -70,7 +73,8 @@ const dateDisabled = (ts) => {
 }
 
 const isAlreadyBook = computed(() => {
-  return alreadyBook.get(city.value)?.includes()
+  const dateRepeat = intersection(getDatesBetween(date.value?.[0], date.value?.[1]), alreadyBook.get(city.value))
+  return alreadyBook.get(city.value) && dateRepeat.length;
 })
 
 const columns = [
@@ -79,17 +83,17 @@ const columns = [
     key: 'typeRoomName'
   },
   {
-    title: '(每晚)价格',
+    title: '元/每晚',
     key: 'price'
   },
   {
     title: '窗',
     key: 'hasWindow'
   },
-  {
-    title: '床',
-    key: 'bedSize'
-  },
+  // {
+  //   title: '床',
+  //   key: 'bedSize'
+  // },
   {
     title: '操作',
     key: 'actions',
@@ -101,8 +105,7 @@ const columns = [
   }
 ]
 
-// TODO
-// const hasAlreadyBook = computed(() => alreadyBook.get(city.value)?.includes())
+const bookMsg = computed(() => `【预定信息】${areaSelected.value?.label} ${selected.value?.typeRoomName} ${hasBreakfase.value ? (isAlreadyBook.value ? '含早' : '免费双早') : '无早'} ${selected.value?.price} ${model.value.name} ${model.value.phone}`)
 
 const handleBook = (row: any) => {
   selected.value = row
@@ -111,9 +114,7 @@ const handleBook = (row: any) => {
 
 const handleCopy = () => {
   if (model.value.name && model.value.phone) {
-    copy(
-      `【预定信息】${areaSelected.value?.label} ${selected.value?.typeRoomName} ${selected.value?.price} ${model.value.name} ${model.value.phone}`
-    )
+    copy(bookMsg.value)
   } else {
     alert('请填写入住人信息')
   }
@@ -121,7 +122,7 @@ const handleCopy = () => {
 
 const copy = async (text: string) => {
   await navigator.clipboard.writeText(text)
-  alert('已复制到剪贴板, 可直接发我下单，并拍下链接')
+  alert('已复制到剪贴板, 可直接粘贴发我进行预定')
 }
 
 onMounted(async () => {
@@ -135,19 +136,25 @@ const handleSearch = throttle(async (query) => {
   const areas = await searchHotel(city.value, query)
   areaOptions.value = handleHotelOptions(areas)
   loading.value = false
-}, 2000)
+}, 1600, {leading: false})
 
 const handleHotelOptions = (res) => {
   return res.filter((i) => i.value.length === 7)
 }
 
 const handleSelectHotel = async () => {
+  if (!date.value || !area.value) {
+    return alert('请输入入住酒店和时间')
+  }
   loading.value = true
-  tableData.value = await getDetail({
+  hasBreakfase.value = !isAlreadyBook.value
+  const detail = await getDetail({
     hotelId: area.value,
     checkInDate: date.value?.[0],
     checkOutDate: date.value?.[1]
   })
+  originTableData.value = hasBreakfase.value ? detail : detail?.map(i => ({ ...i, price: Math.ceil(i.price - 3) }))
+  tableData.value = originTableData.value
   loading.value = false
 }
 
@@ -156,10 +163,20 @@ const handleAreaSelect = (value, option) => {
 }
 
 const handleSwitch = (hasBreakfase: boolean) => {
-  // TODO
-  if (!hasBreakfase) {
-    tableData.value = tableData.value?.map(i => ({...i, price: Math.ceil(i.price - 3)}))
-  } else if () {}
+  if (isAlreadyBook.value && hasBreakfase) {
+    tableData.value = tableData.value?.map(i => ({ ...i, price: Math.ceil(i.price * 1.036) }))
+  } else if (!isAlreadyBook.value && !hasBreakfase) {
+    tableData.value = tableData.value?.map(i => ({ ...i, price: Math.ceil(i.price - 3) }))
+  } else {
+    tableData.value = originTableData.value
+  }
+}
+
+const authCode = ref()
+const authed = ref(false)
+
+const handleAuth = () => {
+  authed.value = authCode.value === '1'
 }
 </script>
 
@@ -167,68 +184,48 @@ const handleSwitch = (hasBreakfase: boolean) => {
   <n-config-provider :locale="zhCN" :date-locale="dateZhCN">
     <header>
       <div class="wrapper">
-        <HelloWorld msg="hzhdd" />
 
-        <n-space vertical>
-          <n-select
-            v-model:value="city"
-            filterable
-            :options="cities"
-            placeholder="请输入城市名, 如北京、成都"
-          />
-          <p>热门城市</p>
-          <n-space>
-            <n-button
-              v-for="item in hotCities"
-              :key="item.label"
-              text
-              tag="a"
-              type="primary"
-              @click="city = item.label"
-            >
-              {{ item.label }}</n-button
-            >
+        <template v-if="!authed">
+          <n-space vertical>
+            <n-input v-model:value="authCode" placeholder="请输入使用码" />
+            <n-button @click="handleAuth">确认</n-button>
           </n-space>
+        </template>
 
-          <template v-if="city">
-            <n-select
-              v-model:value="area"
-              filterable
-              remote
-              :options="areaOptions"
-              :loading="loading"
-              @search="handleSearch"
-              @update:value="handleAreaSelect"
-              placeholder="请输入关键词查询酒店，如地名/地标/酒店名"
-            />
+        <template v-else>
+          <HelloWorld msg="hzhdd" />
 
-            <n-date-picker
-              type="daterange"
-              v-model:formatted-value="date"
-              value-format="yyyy-MM-dd"
-              :is-date-disabled="dateDisabled"
-              placeholder="请选择入住时间"
-            />
+          <n-space vertical>
+            <n-select v-model:value="city" filterable :options="cities" placeholder="请输入城市名, 如北京、成都" />
+            <p>热门城市</p>
+            <n-space>
+              <n-button v-for="item in hotCities" :key="item.label" text tag="a" type="primary"
+                        @click="city = item.label">
+                {{ item.label }}</n-button>
+            </n-space>
 
-            <n-button type="primary" @click="handleSelectHotel">查价</n-button>
+            <template v-if="city">
+              <n-select v-model:value="area" filterable remote :options="areaOptions" :loading="loading"
+                        @search="handleSearch" @update:value="handleAreaSelect" placeholder="输入关键词查询酒店,如地名/地标/酒店名" />
 
-            <n-switch v-model:value="hasBreakfase" @change="handleSwitch">
-              <template #checked> 双早 </template>
-              <template #unchecked> 无早 </template>
-            </n-switch>
+              <n-date-picker type="daterange" v-model:formatted-value="date" value-format="yyyy-MM-dd"
+                             :is-date-disabled="dateDisabled" placeholder="请选择入住时间" />
 
-            <n-data-table :bordered="false" :columns="columns" :data="tableData" />
-          </template>
-        </n-space>
+              <n-button type="primary" @click="handleSelectHotel" :loading="loading">查价</n-button>
 
-        <n-modal :show="showModal">
-          <n-card
-            style="width: 600px"
-            title="请填写入住人信息"
-            :bordered="false"
-            role="dialog"
-            aria-modal="true"
-          >
+              <n-switch v-model:value="hasBreakfase" @update:value="handleSwitch">
+                <template #checked> 双早 </template>
+                <template #unchecked> 无早 </template>
+              </n-switch>
+
+              <n-data-table ref="tableRef" :bordered="false" :columns="columns" :data="tableData" />
+
+            </template>
+          </n-space>
+        </template>
+
+        <n-modal v-model:show="showModal" preset="dialog">
+          <n-card title="请填写入住人信息" :bordered="false" role="dialog" aria-modal="true">
             <n-form ref="formRef" :model="model">
               <n-form-item path="name" label="姓名">
                 <n-input v-model:value="model.name" />
@@ -239,13 +236,7 @@ const handleSwitch = (hasBreakfase: boolean) => {
             </n-form>
             <n-space vertical>
               <n-text depth="3"> 填写好入住人信息，复制以下信息发我： </n-text>
-              <textarea
-                disabled
-                :rows="3"
-                :cols="35"
-                ref="bookText"
-                :value="`【预定信息】${areaSelected?.label} ${selected?.typeRoomName} ${selected?.price} ${model.name} ${model.phone}`"
-              />
+              <textarea disabled :rows="3" ref="bookText" :value="bookMsg" />
               <n-button type="primary" @click="handleCopy">点击复制</n-button>
             </n-space>
           </n-card>
@@ -253,7 +244,7 @@ const handleSwitch = (hasBreakfase: boolean) => {
       </div>
     </header>
 
-    <RouterView />
+    <!-- <RouterView /> -->
   </n-config-provider>
 </template>
 

@@ -11,6 +11,7 @@ export default defineConfig({
     vueJsx(),
   ],
   server: {
+    host: '0.0.0.0',
     proxy: {
       "/hzh": {
         target: 'http://localhost:3660',
