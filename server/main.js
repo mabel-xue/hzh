@@ -1,5 +1,10 @@
 import express from 'express'
 import axios from 'axios'
+import { MongoClient } from "mongodb";
+import { connectToDatabase } from "./db";
+
+const uri = "mongodb+srv://mabelxue:DIoBqK0g7AhagyHw@cluster0.niqvsl8.mongodb.net/?retryWrites=true&w=majority";
+const client = new MongoClient(uri);
 
 const app = express()
 
@@ -73,6 +78,17 @@ app.get('/hotel-detail', async (req, res) => {
       }
     })
     res.json(data)
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: 'An error occurred while processing the request' })
+  }
+})
+
+// booked
+app.get('/get-booked', async (req, res) => {
+  try {
+    const response = await connectToDatabase()
+    res.json(response[0])
   } catch (error) {
     console.error(error)
     res.status(500).json({ error: 'An error occurred while processing the request' })

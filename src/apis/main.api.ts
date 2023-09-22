@@ -30,38 +30,10 @@ export const getDetail = async (params) => {
   return data;
 };
 
-/** 查询渠道基本接入信息 */
-export const channelBaseInfo = async (id) => {
+export const getBooked = async (params) => {
   const {
-    data: { data },
-  } = await axios.get(`${prefix}/baseInfo/${id}`);
-
-  return data;
-};
-
-/** 渠道项新建 */
-export const channelAdd = async (params) => {
-  const {
-    data: { data },
-  } = await axios.post(`${prefix}/add`, params);
-
-  return data;
-};
-
-/** 查询渠道通知地址 */
-export const addrDetail = async (id) => {
-  const {
-    data: { data },
-  } = await axios.get(`${prefix}/addr/${id}`);
-
-  return data;
-};
-
-/** 渠道修改启用状态 */
-export const modifyStatus = async (params) => {
-  const {
-    data: { data },
-  } = await axios.post(`${prefix}/modify-status`, params);
+    data,
+  } = await axios.get(`${prefix}/hotel-detail`, { params });
 
   return data;
 };
