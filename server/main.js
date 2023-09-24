@@ -1,10 +1,6 @@
 import express from 'express'
 import axios from 'axios'
-import { MongoClient } from "mongodb";
-import { connectToDatabase } from "./db";
-
-const uri = "mongodb+srv://mabelxue:DIoBqK0g7AhagyHw@cluster0.niqvsl8.mongodb.net/?retryWrites=true&w=majority";
-const client = new MongoClient(uri);
+import { connectToDatabase } from "./db.js";
 
 const app = express()
 
@@ -28,7 +24,10 @@ app.get('/get-city', async (req, res) => {
     const hotCityList = response.data.content.hotCityList.map((item) => ({
       label: item.cityName,
       value: item.cityName
-    }))
+    })).concat([
+      {value: '威海', label: '威海'},
+      {value: '烟台', label: '烟台'},
+    ])
     res.json({ cities, hotCityList })
   } catch (error) {
     console.error(error)
@@ -63,18 +62,21 @@ app.get('/hotel-detail', async (req, res) => {
     })
     const data = response.data.content.roomPriceList.roomList.map((item) => {
       let amount = 0
-      for (const price_item of item.ratePlanCodeList[0].dailyPrice) {
-        amount += price_item.prices[0].amount
-      }
-
-      const orgPrice = Math.ceil(amount / item.ratePlanCodeList[0].dailyPrice.length)
-      const price = orgPrice < 330 ? Math.ceil(orgPrice + 10) : Math.ceil(orgPrice * 1.038)
-
-      return {
-        typeRoomName: item.typeRoomName,
-        price,
-        hasWindow: item.hasWindow,
-        bedSize: item.bedSize
+      if (item.ratePlanCodeList[0].mealPlanSummary === '2份早餐') {
+        for (const price_item of item.ratePlanCodeList[0].dailyPrice) {
+          amount += price_item.prices[0].amount
+        }
+  
+        const orgPrice = Math.ceil(amount / item.ratePlanCodeList[0].dailyPrice.length)
+        const price = orgPrice < 330 ? Math.ceil(orgPrice + 10) : Math.ceil(orgPrice * 1.038)
+        return {
+          typeRoomName: item.typeRoomName,
+          price,
+          hasWindow: item.hasWindow,
+          bedSize: item.bedSize
+        }
+      } else {
+        res.status(500).json({ error: 'token invalid' })
       }
     })
     res.json(data)
@@ -86,6 +88,17 @@ app.get('/hotel-detail', async (req, res) => {
 
 // booked
 app.get('/get-booked', async (req, res) => {
+  try {
+    const response = await connectToDatabase()
+    res.json(response[0])
+  } catch (error) {
+    console.error(error)
+    res.status(500).json({ error: 'An error occurred while processing the request' })
+  }
+})
+
+app.post('/update-booked', async (req, res) => {
+  console.log('req: ', req);
   try {
     const response = await connectToDatabase()
     res.json(response[0])

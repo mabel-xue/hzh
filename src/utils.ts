@@ -13,3 +13,11 @@ export const getDatesBetween = (startDateStr, endDateStr) => {
   return dates;
 }
 
+export function encrypt(key?) {  
+  const month = String(new Date().getMonth() + 1).padStart(2, '0');
+  const day = String(new Date().getDate()).padStart(2, '0');
+  const encryptKey = key || `${month}${day}`
+  const encryptKeyReverse = encryptKey.split('').reverse().join('')
+  return (Math.ceil((+encryptKey*+encryptKeyReverse)/3)+'').slice(-4);  
+}
+  

@@ -1,8 +1,7 @@
 <script setup lang="tsx">
-import { RouterLink, RouterView } from 'vue-router'
 import HelloWorld from './components/HelloWorld.vue'
-import { computed, onMounted, ref } from 'vue'
-import { getCities, getDetail, searchHotel } from '@/apis'
+import { computed, onMounted, reactive, ref, toRef } from 'vue'
+import { getBooked, getCities, getDetail, searchHotel } from '@/apis'
 import {
   NModal,
   NForm,
@@ -21,61 +20,7 @@ import {
   dateZhCN
 } from 'naive-ui'
 import { throttle, intersection } from 'lodash-es'
-import { getDatesBetween } from './utils'
-
-const alreadyBook = new Map([
-  ['北京', ['0923']],
-  ['天津', ['1014']],
-  ['杭州', ['0915', '0916', '1004']],
-  ['连云港', ['0927']],
-  ['济南', ['0916', '0926', '1005']],
-  ['乌鲁木齐', ['0919']],
-  ['长沙', ['0915']],
-  ['青岛', ['0915', '0916']],
-  ['威海', ['0924', '0925', '0926', '0927']],
-  ['南京', ['0914', '0915', '0918', '0919', '1006', '1007']],
-  ['昆明', ['0915']],
-  ['洛阳', ['0929', '0930']],
-  ['广州', ['0920', '0921', '0926', '0927']],
-  ['香格里拉', ['1017', '1018']],
-  ['珠江', ['0914', '0920', '0921', '0926', '0927', '0928']]
-])
-
-const city = ref()
-const cities = ref([])
-const hotCities = ref([])
-const area = ref()
-const areaOptions = ref<any>([])
-const date = ref()
-const loading = ref()
-const hasBreakfase = ref(true)
-const oneDayMillis = 24 * 60 * 60 * 1000
-const tableData = ref()
-const originTableData = ref()
-const showModal = ref(false)
-const bookText = ref()
-const model = ref({
-  name: '',
-  phone: ''
-})
-const areaSelected = ref()
-const selected = ref()
-const tableRef = ref()
-
-const dateDisabled = (ts) => {
-  const date = new Date(ts).getDate()
-  const today = new Date().getDate()
-  if (new Date().getHours() >= 3) {
-    return date < today
-  } else {
-    return ts < Date.now() - oneDayMillis
-  }
-}
-
-const isAlreadyBook = computed(() => {
-  const dateRepeat = intersection(getDatesBetween(date.value?.[0], date.value?.[1]), alreadyBook.get(city.value))
-  return alreadyBook.get(city.value) && dateRepeat.length;
-})
+import { getDatesBetween, encrypt } from './utils'
 
 const columns = [
   {
@@ -99,13 +44,53 @@ const columns = [
     key: 'actions',
     render: (row: any) => (
       <NButton type="primary" onClick={() => handleBook(row)}>
-        我想预定
+        我要预定
       </NButton>
     )
   }
 ]
+const city = ref()
+const cities = ref([])
+const hotCities = ref<any>([])
+const area = ref()
+const areaOptions = ref<any>([])
+const date = ref()
+const loading = ref()
+const hasBreakfase = ref(true)
+const oneDayMillis = 24 * 60 * 60 * 1000
+const tableData = ref()
+const originTableData = ref()
+const showModal = ref(false)
+const bookText = ref()
+const model = ref({
+  name: '',
+  phone: ''
+})
+const areaSelected = ref()
+const selected = ref()
+const tableRef = ref()
+const alreadyBook = ref({})
 
-const bookMsg = computed(() => `【预定信息】${areaSelected.value?.label} ${selected.value?.typeRoomName} ${hasBreakfase.value ? (isAlreadyBook.value ? '含早' : '免费双早') : '无早'} ${selected.value?.price} ${model.value.name} ${model.value.phone}`)
+const dateDisabled = (ts) => {
+  const date = new Date(ts)
+  const today = new Date()
+  if (new Date().getHours() >= 3) {
+    return date < today
+  } else {
+    return ts < Date.now() - oneDayMillis
+  }
+}
+
+const isAlreadyBook = computed(() => {
+  console.log(alreadyBook.value[city.value]);
+  const dateRepeat = intersection(getDatesBetween(date.value?.[0], date.value?.[1]), alreadyBook.value[city.value])
+  console.log('dateRepeat: ', dateRepeat);
+  return alreadyBook.value[city.value] && dateRepeat.length;
+})
+
+const bookMsg = computed(() => `【预定信息】
+${areaSelected.value?.label} ${selected.value?.typeRoomName} ${hasBreakfase.value ? (isAlreadyBook.value ? '含早' : '免费双早') : '无早'} ${selected.value?.price}
+${model.value.name} ${model.value.phone}`)
 
 const handleBook = (row: any) => {
   selected.value = row
@@ -121,11 +106,15 @@ const handleCopy = () => {
 }
 
 const copy = async (text: string) => {
+  console.log('navigator: ', navigator);
   await navigator.clipboard.writeText(text)
   alert('已复制到剪贴板, 可直接粘贴发我进行预定')
 }
 
 onMounted(async () => {
+  const bookedH = await getBooked()
+  alreadyBook.value = bookedH
+  console.log('alreadyBook.value: ', alreadyBook.value);
   const cityData = await getCities()
   cities.value = cityData?.cities
   hotCities.value = cityData?.hotCityList
@@ -136,7 +125,7 @@ const handleSearch = throttle(async (query) => {
   const areas = await searchHotel(city.value, query)
   areaOptions.value = handleHotelOptions(areas)
   loading.value = false
-}, 1600, {leading: false})
+}, 1200, {leading: false})
 
 const handleHotelOptions = (res) => {
   return res.filter((i) => i.value.length === 7)
@@ -173,10 +162,11 @@ const handleSwitch = (hasBreakfase: boolean) => {
 }
 
 const authCode = ref()
-const authed = ref(false)
+const authed = ref(process.env.NODE_ENV==='development')
 
+console.log(encrypt());
 const handleAuth = () => {
-  authed.value = authCode.value === '1'
+  authed.value = authCode.value === encrypt()
 }
 </script>
 
@@ -205,20 +195,23 @@ const handleAuth = () => {
             </n-space>
 
             <template v-if="city">
-              <n-select v-model:value="area" filterable remote :options="areaOptions" :loading="loading"
+              <n-select v-model:value="area" filterable remote :options="areaOptions" :loading="loading" clearable
                         @search="handleSearch" @update:value="handleAreaSelect" placeholder="输入关键词查询酒店,如地名/地标/酒店名" />
 
-              <n-date-picker type="daterange" v-model:formatted-value="date" value-format="yyyy-MM-dd"
+              <n-date-picker type="daterange" v-model:formatted-value="date" value-format="yyyy-MM-dd" clearable
                              :is-date-disabled="dateDisabled" placeholder="请选择入住时间" />
 
               <n-button type="primary" @click="handleSelectHotel" :loading="loading">查价</n-button>
 
-              <n-switch v-model:value="hasBreakfase" @update:value="handleSwitch">
-                <template #checked> 双早 </template>
-                <template #unchecked> 无早 </template>
-              </n-switch>
+              <template v-if="!loading">
+                <n-switch v-model:value="hasBreakfase" @update:value="handleSwitch">
+                  <template #checked> 双早 </template>
+                  <template #unchecked> 无早 </template>
+                </n-switch>
+  
+                <n-data-table ref="tableRef" :bordered="false" :columns="columns" :data="tableData" />
+              </template>
 
-              <n-data-table ref="tableRef" :bordered="false" :columns="columns" :data="tableData" />
 
             </template>
           </n-space>
@@ -236,7 +229,7 @@ const handleAuth = () => {
             </n-form>
             <n-space vertical>
               <n-text depth="3"> 填写好入住人信息，复制以下信息发我： </n-text>
-              <textarea disabled :rows="3" ref="bookText" :value="bookMsg" />
+              <textarea disabled :rows="6" :cols="25" ref="bookText" :value="bookMsg" />
               <n-button type="primary" @click="handleCopy">点击复制</n-button>
             </n-space>
           </n-card>
@@ -249,6 +242,10 @@ const handleAuth = () => {
 </template>
 
 <style scoped>
+
+:deep(.n-date-panel-actions) {
+  justify-content: start !important;
+}
 header {
   line-height: 1.5;
   max-height: 100vh;
